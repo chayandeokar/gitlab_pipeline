@@ -1,0 +1,38 @@
+stages:
+  - mvnbuild
+  - podmanbuild
+  - deployment
+
+mvnbuild:
+  stage: mvnbuild
+  image: rvancea/maven-chrome-jdk8:latest
+  services:
+    - docker:20.10.16-dind
+  script:
+    - mvn package
+    - mkdir -p pkg
+    - mv target/demo.war pkg/demo.war
+  artifacts:
+    paths:
+      - pkg/demo.war
+
+
+podmanbuild:
+  stage: podmanbuild
+  image: quay.io/podman/stable
+  script:
+    - podman login hub-peerxp.vegaops.com -u $CI_REGISTRY_USER -p $dockertoken
+    - podman build -t hub-peerxp.vegaops.com/devops-assignment/java_100823_5885 .
+    - podman push hub-peerxp.vegaops.com/devops-assignment/java_100823_5885
+  dependencies:
+    - mvnbuild
+
+deployment:
+  stage: deployment
+  tags:
+    - runner  
+  script:
+    - echo $dockertoken | docker login -u $CI_REGISTRY_USER hub-peerxp.vegaops.com --password-stdin
+    - docker pull hub-peerxp.vegaops.com/devops-assignment/java_100823_5885
+    - docker run -d -p 80:8080 hub-peerxp.vegaops.com/devops-assignment/java_100823_5885 
+    - docker ps
